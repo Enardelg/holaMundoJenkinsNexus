@@ -1,3 +1,14 @@
+def callBuild() {
+    load 'build.groovy'
+}
+
+def callDeploy() {
+    load 'deploy.groovy'
+}
+
+pipeline {
+    agent none
+
     environment {
         // Definiciones de variables comunes para ambas pipelines 
 
