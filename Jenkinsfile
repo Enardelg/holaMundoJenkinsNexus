@@ -17,7 +17,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'github', url: 'git@github.com:calamza/holamundo.git']]])
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'github', url: 'git@github.com:Enardelg/holaMundoJenkinsNexus.git']]])
             }
         }
 
@@ -68,7 +68,6 @@ pipeline {
             steps {
                 sh 'docker login -u admin -p hola1234 192.168.42.131:8082'
                 sh 'docker push 192.168.42.131:8082/holamundo:latest'
-                sh 'docker run -d -p 8085:80 holamundo'
             }
         }
 
