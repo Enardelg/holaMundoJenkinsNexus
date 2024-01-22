@@ -1,73 +1,75 @@
 pipeline {
-    agent none
+    agent {
+        label 'maven'
+    }
 
     environment {
-        // Definiciones de variables comunes para ambas pipelines
-
-        // Maven
-        MAVEN_HOME = "/opt/apache-maven-3.6.3"
-
-        // Nexus
-        NEXUS_VERSION = "nexus3"
-        NEXUS_PROTOCOL = "http"
-        NEXUS_URL = "192.168.42.131:8081"
-        NEXUS_REPOSITORY = "maven-releases"
-        NEXUS_CREDENTIAL_ID = "nexus"
-
-        // Docker
-        DOCKER_VERSION = "0.2.2"
-        DOCKER_REGISTRY_URL = "192.168.42.131:8082"
-        DOCKER_REGISTRY_CREDENTIAL_ID = "docker-credentials"
-
-        // GitHub
-        GITHUB_CREDENTIAL_ID = "github-credentials"
+        NEXUS_VERSION = 'nexus3'
+        NEXUS_PROTOCOL = 'http'
+        NEXUS_URL = '192.168.42.131:8081'
+        NEXUS_REPOSITORY = 'maven-releases'
+        NEXUS_CREDENTIAL_ID = 'nexus'
+        DOCKER_VERSION = '0.2.2'
     }
 
     stages {
-        stage('Build') {
-            agent {
-                label 'maven'
-            }
+        stage('Checkout') {
             steps {
-                // Contenido de build.groovy
-                script {
-                    // Contenido de build.groovy
-                    sh '''
-                        #mvn clean install
-                        /opt/apache-maven-3.6.3/bin/mvn package
-                    '''
-                }
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']], extensions: [], userRemoteConfigs: [[credentialsId: 'github', url: 'git@github.com:calamza/holamundo.git']]])
             }
         }
 
-        stage('Deploy') {
-            agent {
-                label 'docker'
-            }
-            steps {
-                // Contenido de deploy.groovy
-                script {
-                    // Contenido de deploy.groovy
-                    sh '''
-                        pwd 
-                        curl -v -u admin:hola1234 -o app.jar http://192.168.42.131:8081/repository/maven-releases/org/springframework/Jenkins-holamundo/0.2.2/Jenkins-holamundo-0.2.2.jar
-                    '''
-                }
-            }
-        }
-
-        // Otras etapas pueden agregarse según sea necesario
-
-        stage("Post") {
-            agent {
-                label 'docker'
-            }
+        stage('Build Artifact') {
             steps {
                 sh '''
-                    pwd
-                    echo "Clean up workfolder"
-                    rm -Rf *
-                '''
+          mvn clean install
+        '''
+            }
+        }
+
+        stage('Upload to Nexus') {
+            steps {
+                script {
+                    pom = readMavenPom(file: 'pom.xml')
+                    filesByGlob = findFiles(glob: "target/*.${pom.packaging}")
+                    artifactPath = filesByGlob[0].path
+                    artifactExists = fileExists artifactPath
+
+                    if (artifactExists) {
+                        nexusArtifactUploader(
+              nexusVersion: NEXUS_VERSION,
+              protocol: NEXUS_PROTOCOL,
+              nexusUrl: NEXUS_URL,
+              groupId: pom.groupId,
+              version: pom.version,
+              repository: NEXUS_REPOSITORY,
+              credentialsId: NEXUS_CREDENTIAL_ID,
+              artifacts: [
+                [artifactId: pom.artifactId,
+                 classifier: '',
+                 file: artifactPath,
+                 type: pom.packaging],
+
+                [artifactId: pom.artifactId,
+                 classifier: '',
+                 file: 'pom.xml',
+                 type: 'pom']
+              ]
+            )
+          } else {
+                        error "*** File: ${artifactPath}, could not be found"
+                    }
+                }
+            }
+        }
+
+        stage('Post') {
+            steps {
+                sh '''
+          pwd
+          echo "Clean up workfolder"
+          rm -Rf *
+        '''
             }
         }
     }
